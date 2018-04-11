@@ -10,6 +10,7 @@ Bela-specific UGens.
 */
 
 ServerOptions.outDevices
+s.options.numOutputBusChannels
 
 (
 var fileDir =  "/Users/avneeshsarwate/SoundCage/";
@@ -17,6 +18,7 @@ var fileDir =  "/Users/avneeshsarwate/SoundCage/";
 s = Server.default;
 
 s.options.device = ServerOptions.outDevices[1];
+s.options.numOutputBusChannels = 4;
 /*s.options.numAnalogInChannels = 8;
 s.options.numAnalogOutChannels = 8;
 s.options.numDigitalChannels = 16;
@@ -33,6 +35,7 @@ s.waitForBoot({
 	special = false;
 	files = ["bellA", "bellC", "bellF", "bellG", "clap"];
 	rates = [2, 2, 2, 2];
+    ~rates = rates;
 
     "All USB Ports".postln;
 	SerialPort.listDevices;
@@ -45,7 +48,7 @@ s.waitForBoot({
 	distanceValues = Array.fill(numSerialPorts, 0);
 	distanceBusses = Array.fill(numSerialPorts, {Bus.control(s)});
 
-	(0..(numSerialPorts-1)).do({ |index|
+	/*(0..(numSerialPorts-1)).do({ |index|
 
 		var serialRoutineFunc = {
 			var port, byte, str, setColor;
@@ -85,7 +88,7 @@ s.waitForBoot({
 		};
 
 		Routine.run(serialRoutineFunc);
-	});
+	});*/
 
 	Routine.run {
 		s.bootSync;
