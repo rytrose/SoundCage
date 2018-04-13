@@ -97,7 +97,6 @@ s.waitForBoot({
 				baudrate: 9600,
 				crtscts: true);
 
-			["PORT IND", index].postln;
 			usbPorts.put(index, port);
 		});
 
@@ -110,12 +109,13 @@ s.waitForBoot({
 
 					while({read == false}, {
 						currentPort.putAll("1\n");
-						if(currentPort.read==10, {
+						if(currentPort.next==10, {
 							var distValue;
 							str = "";
 							while({byte = currentPort.read; byte !=13 }, {
 								str= str++byte.asAscii;
 							});
+							str.postln;
 
 							distValue = str.asFloat;
 							// ((index+1).asString ++ " :" ++ distValue.asString).postln;
@@ -217,7 +217,7 @@ s.waitForBoot({
 		}.loop
 	});
 
-	~arduinoLog.play;
+	~arduinoLog.stop;
 
 
 
