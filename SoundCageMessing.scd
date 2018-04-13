@@ -38,7 +38,7 @@ s.waitForBoot({
 	files = ["bellA", "bellC", "bellF", "bellG", "clap"];
 	rates = [2, 2, 2, 2];
 	rawDistances = [0, 0, 0, 0];
-	usbPorts = Array.new(4);
+	usbPorts = Array.fill(4, 0);
 	~rates = rates;
 
 	"All USB Ports".postln;
@@ -97,18 +97,19 @@ s.waitForBoot({
 				baudrate: 9600,
 				crtscts: true);
 
+			["PORT IND", index].postln;
 			usbPorts.put(index, port);
 		});
 
 		readValues = {
 			inf.do{
 				(0..(numSerialPorts-1)).do({ |index|
-					var currentPort, byte, str, read;
+					var currentPort, byte, str, read, test;
 					currentPort = usbPorts[index];
-					currentPort.put(1);
 					read = false;
 
 					while({read == false}, {
+						currentPort.putAll("1\n");
 						if(currentPort.read==10, {
 							var distValue;
 							str = "";
