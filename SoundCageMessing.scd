@@ -33,13 +33,15 @@ s.options.postln;
 
 s.waitForBoot({
     var trackBuffer, synth, length, files, file, rates, newLength, iChanging, special, specialRate, avgBufferSize, distanceValues, colorStates, numSerialPorts, distanceBusses, rawDistances, usbPorts;
-    var readValues;
+    var readValues, clock;
 
     special = false;
     files = ["bellA", "bellC", "bellF", "bellG", "clap"];
     rates = [2, 2, 2, 2];
     rawDistances = [0, 0, 0, 0];
     usbPorts = Array.fill(4, 0);
+
+    clock = TempoClock.new(5);
     ~rates = rates;
 
     "All USB Ports".postln;
@@ -88,7 +90,7 @@ s.waitForBoot({
                             str= str++byte.asAscii;
                         });
                         if(index == 0, {
-                        [~printInd, str].postln;
+                            [~printInd, str].postln;
                         });
 
                         distValue = str.asFloat;
@@ -159,13 +161,16 @@ s.waitForBoot({
     "STARING SYNTH PLAY LOOP".postln;
     for(0, 3, {
         arg i;
-        Routine.run {
+        var task = Task.new({
             {
-                synth = Synth.new(files[i]);
-                rates[i].wait;
+                if(clock.beats.floor % rates[i] == 0, {
+                    synth = Synth.new(files[i]);
+                });
+                1.wait;
                 ["playing bell", i, rates[i]].postln;
             }.loop
-        };
+        }, clock);
+        task.play;
     });
 
 
