@@ -1,6 +1,5 @@
 #include <Wire.h>
 #include <CircularBuffer.h>
-#include "Adafruit_TCS34725.h"
 
 // Pin definitions
 #define TRIG 13
@@ -54,7 +53,7 @@ float bufferAverage(CircularBuffer<int,DISTANCE_HISTORY> b, int i1, int i2) {
 int measuredDistance = 0;
 long duration = 0.0;
 CircularBuffer<int,DISTANCE_HISTORY> distanceMeasurements;
-void getCurrentDistance() {
+float getCurrentDistance() {
   digitalWrite(TRIG, LOW); // Turn off ultrasound signal
   delayMicroseconds(2); // Ensure cleared
   digitalWrite(TRIG, HIGH); // Send 10µs of ultrasound signal
@@ -62,8 +61,14 @@ void getCurrentDistance() {
   digitalWrite(TRIG, LOW); // Turn off ultrasound signal
   duration = pulseIn(ECHO, HIGH); // Reads ultrasound, returns travel time in µs
   measuredDistance = duration * 0.034 / 2; // Calculating the distance
-  if(measuredDistance < DISTANCE_MAX) distanceMeasurements.push(measuredDistance);
-  else distanceMeasurements.push(DISTANCE_MAX);
+  if(measuredDistance < DISTANCE_MAX) {
+    distanceMeasurements.push(measuredDistance); 
+    return measuredDistance;
+  }
+  else {
+    distanceMeasurements.push(DISTANCE_MAX); 
+    return DISTANCE_MAX;
+  }
 }
 
 float currentDistance;
@@ -86,8 +91,8 @@ void loop(void) {
     }
     else // ... otherwise, if it is an ASCII 10 \n character, the buffer is full so decode it.
     {
-      getCurrentDistance();
-      currentDistance = bufferAverage(distanceMeasurements, 0, distanceMeasurements.size());
+      currentDistance = getCurrentDistance();
+//      currentDistance = bufferAverage(distanceMeasurements, 0, distanceMeasurements.size());
       Serial.println(currentDistance);
       msg_buffer = "";
     }
