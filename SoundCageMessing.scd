@@ -32,17 +32,19 @@ s.options.numOutputBusChannels = 2;*/
 s.options.postln;
 
 s.waitForBoot({
-    var trackBuffer, synth, length, files, file, rates, newLength, iChanging, special, specialRate, avgBufferSize, distanceValues, colorStates, numSerialPorts, distanceBusses, rawDistances, usbPorts;
-    var readValues, clock, lastTouchTime, controlBusses;
+    var trackBuffer, length, files, file, rates, newLength, iChanging, special, specialRate, avgBufferSize, distanceValues, colorStates, numSerialPorts, distanceBusses, rawDistances, usbPorts;
+    var readValues, clock, lastTouchTime, controlBusses, playingPerotin, synths;
 
     special = false;
-    files = ["bellA", "bellC", "bellF", "bellG", "clap"];
+    files = ["bellA", "bellC", "bellF", "bellG", "perotin1"];
     rates = [2, 2, 2, 2];
     rawDistances = [0, 0, 0, 0];
     usbPorts = Array.fill(4, 0);
     lastTouchTime = [0, 0, 0, 0];
     ~lastTouchTime = lastTouchTime;
     controlBusses = Array.fill(files.size, {Bus.control(s, 1)});
+    playingPerotin = Array.fill(4, {0});
+    synths = Array.fill(4, {nil});
 
     clock = TempoClock.new(5);
     ~clock = clock;
@@ -76,11 +78,11 @@ s.waitForBoot({
     ~printInd = 0;
 
     ~printDist = true;
+    ~distlog = [nil, nil, nil, nil];
 
     "STARTING USB READ/WRITE LOOP".postln;
     readValues = {
         inf.do{
-            var distLog = List.new;
             (0..(numSerialPorts-1)).do({ |index|
                 var currentPort, byte, str, read, test;
                 currentPort = usbPorts[index];
@@ -96,13 +98,14 @@ s.waitForBoot({
                         while({byte = currentPort.read; byte !=13 }, {
                             str= str++byte.asAscii;
                         });
-                        distLog.add(str);
+                        // distLog.add(str);
 
                         distValue = str.asFloat;
                         // ((index+1).asString ++ " :" ++ distValue.asString).postln;
                         rawDistances[index] = distValue;
                         if(distValue < 150, {
                             var zoneRate = ((distValue/30.0).floor + 1) * 2;
+                            ~distlog[index] = zoneRate;
                             controlBusses[index].set(1);
                             rates[index] = zoneRate;
                             lastTouchTime[index] = clock.beats;
@@ -112,7 +115,16 @@ s.waitForBoot({
                     });
                 });
             });
-            if(~printDist, {distLog.postln});
+            (0..(numSerialPorts-1)).do({|i|
+                if((rates[i]==2) && (rates[(i-1)%numSerialPorts] == 8), {
+                    if(playingPerotin[i] == 0, {
+                        ["PEROTIN ON DECK", i].postln;
+                        playingPerotin[i] = 1;
+                        clock.sched(10*clock.tempo, {playingPerotin[i] = 0; ["PEROTIN ENDED", i].postln;});
+                    });
+                });
+            });
+            if(~printDist, {~distlog.postln});
         };
     };
 
@@ -127,7 +139,7 @@ s.waitForBoot({
 
         s.sync;
 
-        for(0, files.size-1, {
+        for(0, files.size-2, {
             arg i;
             file = files[i];
             trackBuffer = Buffer.readChannel(s, fileDir ++ file ++ ".wav", action: {
@@ -143,6 +155,19 @@ s.waitForBoot({
             }).send(s);
 
             s.sync;
+
+            trackBuffer = Buffer.readChannel(s, fileDir ++ files.last ++ ".wav", action: {
+                length = (trackBuffer.numFrames / trackBuffer.numChannels) / trackBuffer.sampleRate;
+                [fileDir ++ files.last ++ ".wav", length].postln;
+            }, channels:[0]);
+            s.sync;
+
+            SynthDef.new(files.last++i, {
+                var freq = 1500;
+                Out.ar(i, LPF.ar(LPF.ar(PlayBuf.ar(1, trackBuffer, doneAction:2), freq), freq));
+            }).send(s);
+
+            s.sync
         });
 
         s.sync;
@@ -158,8 +183,17 @@ s.waitForBoot({
             var task = Task.new({
                 {
                     if((clock.beats.floor % rates[i]) == 0, {
-                        var soundingWindow = (~decayTime + ~preDecayBuffer) * clock.tempo;å
-                        if((clock.beats - lastTouchTime[i]) < soundingWindow, {synth = Synth.new(files[i])});
+                        var soundingWindow = (~decayTime + ~preDecayBuffer) * clock.tempo;
+                        if(((clock.beats - lastTouchTime[i]) < soundingWindow) && (playingPerotin[i] == 0), {
+                            synths[i] = Synth.new(files[i]);
+                        });
+                        if(playingPerotin[i] == 1, {
+                            playingPerotin[i] = 2;
+                            /*synths[i].free;
+                            s.sync;*/
+                            synths[i] = Synth.new(files.last++i);
+                            ["PEROTIN PLAYED", i].postln;
+                        });
                     });
                     1.wait;
                     if(~bellLog, {["playing bell", i, rates[i]].postln});
@@ -186,7 +220,7 @@ s.waitForBoot({
         }).play;
 
 
-        "STARTING EASTER EGG SOUND LOOP".postln;
+        /*"STARTING EASTER EGG SOUND LOOP".postln;
         Routine.run {
             {
                 // Add hidden state conditions to this
@@ -202,7 +236,7 @@ s.waitForBoot({
                 );
                 0.2.wait;
             }.loop
-        };
+        };*/
 
     };
 
@@ -234,7 +268,7 @@ s.waitForBoot({
 });
 )
 max(0, 6)
-
+-1%4
 for(0, 5, {arg i; i.postln})
 (0..5)
 (
