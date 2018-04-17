@@ -103,6 +103,7 @@ s.waitForBoot({
                         rawDistances[index] = distValue;
                         if(distValue < 150, {
                             var zoneRate = ((distValue/30.0).floor + 1) * 2;
+                            controlBusses[index].set(1);
                             rates[index] = zoneRate;
                             lastTouchTime[index] = clock.beats;
                         });
