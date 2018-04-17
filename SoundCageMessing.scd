@@ -60,7 +60,7 @@ s.waitForBoot({
     distanceBusses = Array.fill(numSerialPorts, {Bus.control(s)});
 
 
-    /*"INITIALIZING USB PORTS".postln;
+    "INITIALIZING USB PORTS".postln;
     (0..(numSerialPorts-1)).do({ |index|
         var port, byte, str, setColor;
         ("This usb port: " ++ SerialPort.devices[index]).postln;
@@ -75,9 +75,12 @@ s.waitForBoot({
 
     ~printInd = 0;
 
+    ~printDist = true;
+
     "STARTING USB READ/WRITE LOOP".postln;
     readValues = {
         inf.do{
+            var distLog = List.new;
             (0..(numSerialPorts-1)).do({ |index|
                 var currentPort, byte, str, read, test;
                 currentPort = usbPorts[index];
@@ -93,9 +96,7 @@ s.waitForBoot({
                         while({byte = currentPort.read; byte !=13 }, {
                             str= str++byte.asAscii;
                         });
-                        if(index == 0, {
-                            [~printInd, str].postln;
-                        });
+                        distLog.add(str);
 
                         distValue = str.asFloat;
                         // ((index+1).asString ++ " :" ++ distValue.asString).postln;
@@ -106,14 +107,15 @@ s.waitForBoot({
                             lastTouchTime[index] = clock.beats;
                         });
                         read = true;
-                        0.05.wait;
+                        0.001.wait;
                     });
                 });
             });
+            if(~printDist, {distLog.postln});
         };
     };
 
-    Routine.run(readValues);*/
+    Routine.run(readValues);
 
 
     "DEFINING SYNTHS".postln;
@@ -144,24 +146,29 @@ s.waitForBoot({
         s.sync;
 
         "STARING SYNTH PLAY LOOP".postln;
+
+        ~decayTime = 2; //seconds
+        ~preDecayBuffer 1; //seconds
+
+        ~bellLog = false;
         for(0, files.size-2, {
             arg i;
             var task = Task.new({
                 {
                     if((clock.beats.floor % rates[i]) == 0, {
+                        var soundingWindow = (~decayTime + ~preDecayBuffer) * clock.tempo;
                         controlBusses[i].set(1);
                         s.sync;
-                        synth = Synth.new(files[i]);
+                        if((clock.beats - lastTouchTime[i]) < soundingWindow, {synth = Synth.new(files[i])});
                     });
                     1.wait;
-                    ["playing bell", i, rates[i]].postln;
+                    if(~bellLog, {["playing bell", i, rates[i]].postln});
                 }.loop
             }, clock);
             task.play;
         });
 
-        ~decayTime = 4; //seconds
-        ~preDecayBuffer = 1; //seconds
+
 
         Task({
             {
