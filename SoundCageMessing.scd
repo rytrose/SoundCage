@@ -137,7 +137,8 @@ s.waitForBoot({
             s.sync;
 
             SynthDef.new(file, {
-                Out.ar(i, PlayBuf.ar(1, trackBuffer, doneAction:2) * In.kr(controlBusses[i]) );
+                var freq = 1500;
+                Out.ar(i, LPF.ar(LPF.ar(PlayBuf.ar(1, trackBuffer, doneAction:2), freq), freq) * In.kr(controlBusses[i]) );
             }).send(s);
 
             s.sync;
@@ -148,7 +149,7 @@ s.waitForBoot({
         "STARING SYNTH PLAY LOOP".postln;
 
         ~decayTime = 2; //seconds
-        ~preDecayBuffer 1; //seconds
+        ~preDecayBuffer = 1; //seconds
 
         ~bellLog = false;
         for(0, files.size-2, {
@@ -156,9 +157,7 @@ s.waitForBoot({
             var task = Task.new({
                 {
                     if((clock.beats.floor % rates[i]) == 0, {
-                        var soundingWindow = (~decayTime + ~preDecayBuffer) * clock.tempo;
-                        controlBusses[i].set(1);
-                        s.sync;
+                        var soundingWindow = (~decayTime + ~preDecayBuffer) * clock.tempo;å
                         if((clock.beats - lastTouchTime[i]) < soundingWindow, {synth = Synth.new(files[i])});
                     });
                     1.wait;
