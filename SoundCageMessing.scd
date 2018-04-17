@@ -33,15 +33,19 @@ s.options.postln;
 
 s.waitForBoot({
     var trackBuffer, synth, length, files, file, rates, newLength, iChanging, special, specialRate, avgBufferSize, distanceValues, colorStates, numSerialPorts, distanceBusses, rawDistances, usbPorts;
-    var readValues, clock;
+    var readValues, clock, lastTouchTime, controlBusses;
 
     special = false;
     files = ["bellA", "bellC", "bellF", "bellG", "clap"];
     rates = [2, 2, 2, 2];
     rawDistances = [0, 0, 0, 0];
     usbPorts = Array.fill(4, 0);
+    lastTouchTime = [0, 0, 0, 0];
+    ~lastTouchTime = lastTouchTime;
+    controlBusses = Array.fill(files.size, {Bus.control(s, 1)});
 
     clock = TempoClock.new(5);
+    ~clock = clock;
     ~rates = rates;
 
     "All USB Ports".postln;
@@ -56,7 +60,7 @@ s.waitForBoot({
     distanceBusses = Array.fill(numSerialPorts, {Bus.control(s)});
 
 
-    "INITIALIZING USB PORTS".postln;
+    /*"INITIALIZING USB PORTS".postln;
     (0..(numSerialPorts-1)).do({ |index|
         var port, byte, str, setColor;
         ("This usb port: " ++ SerialPort.devices[index]).postln;
@@ -97,8 +101,9 @@ s.waitForBoot({
                         // ((index+1).asString ++ " :" ++ distValue.asString).postln;
                         rawDistances[index] = distValue;
                         if(distValue < 150, {
-                            var zoneRate = (distValue/30.0).floor + 1;
+                            var zoneRate = ((distValue/30.0).floor + 1) * 2;
                             rates[index] = zoneRate;
+                            lastTouchTime[index] = clock.beats;
                         });
                         read = true;
                         0.05.wait;
@@ -108,39 +113,18 @@ s.waitForBoot({
         };
     };
 
-    Routine.run(readValues);
-    /*	{
-    var serialRoutineFunc = {
+    Routine.run(readValues);*/
 
-
-    inf.do{
-    if(port.read==10, {
-    var distValue;
-    str = "";
-    while({byte = port.read; byte !=13 }, {
-    str= str++byte.asAscii;
-    });
-
-    distValue = str.asFloat;
-    // ((index+1).asString ++ " :" ++ distValue.asString).postln;
-    rawDistances[index] = distValue;
-    if(distValue < 150, {
-    var zoneRate = (distValue/30.0).floor + 1;
-    rates[index] = zoneRate;
-    });
-    });
-    };
-    };
-
-
-    Routine.run(serialRoutineFunc);
-    });*/
 
     "DEFINING SYNTHS".postln;
     Routine.run {
         s.bootSync;
 
-        for(0, 4, {
+        (0..files.size).do({|i| controlBusses[i].set(1)});
+
+        s.sync;
+
+        for(0, files.size-1, {
             arg i;
             file = files[i];
             trackBuffer = Buffer.readChannel(s, fileDir ++ file ++ ".wav", action: {
@@ -151,46 +135,71 @@ s.waitForBoot({
             s.sync;
 
             SynthDef.new(file, {
-                Out.ar(i, PlayBuf.ar(1, trackBuffer, doneAction:2));
+                Out.ar(i, PlayBuf.ar(1, trackBuffer, doneAction:2) * In.kr(controlBusses[i]) );
             }).send(s);
 
             s.sync;
         });
-    };
 
-    "STARING SYNTH PLAY LOOP".postln;
-    for(0, 3, {
-        arg i;
-        var task = Task.new({
-            {
-                if(clock.beats.floor % rates[i] == 0, {
-                    synth = Synth.new(files[i]);
-                });
-                1.wait;
-                ["playing bell", i, rates[i]].postln;
-            }.loop
-        }, clock);
-        task.play;
-    });
+        s.sync;
 
-
-    "STARTING EASTER EGG SOUND LOOP".postln;
-    Routine.run {
-        {
-            // Add hidden state conditions to this
-            if(rates[0] / rates[1] == 0.5,
-                {special = true},
-                {special = false}
-            );
-            if(special,
+        "STARING SYNTH PLAY LOOP".postln;
+        for(0, files.size-2, {
+            arg i;
+            var task = Task.new({
                 {
-                    // Add less terrible hidden state sounds to this
-                    synth = Synth.new("clap");
-                }
-            );
-            0.2.wait;
-        }.loop
+                    if((clock.beats.floor % rates[i]) == 0, {
+                        controlBusses[i].set(1);
+                        s.sync;
+                        synth = Synth.new(files[i]);
+                    });
+                    1.wait;
+                    ["playing bell", i, rates[i]].postln;
+                }.loop
+            }, clock);
+            task.play;
+        });
+
+        ~decayTime = 4; //seconds
+        ~preDecayBuffer = 1; //seconds
+
+        Task({
+            {
+                (0..files.size-2).do({|i|
+                    var noTouchTime = clock.beats - lastTouchTime[i];
+                    if(noTouchTime > (~preDecayBuffer * clock.tempo), {
+                        var decayOffset = noTouchTime - (~preDecayBuffer * clock.tempo);
+                        var decayTime_beats = (~decayTime * clock.tempo);
+                        var decayFraction = max((decayTime_beats - decayOffset) / decayTime_beats, 0);
+                        controlBusses[i].set(decayFraction);
+                    });
+                });
+                0.1.wait;
+            }.loop;
+        }).play;
+
+
+        "STARTING EASTER EGG SOUND LOOP".postln;
+        Routine.run {
+            {
+                // Add hidden state conditions to this
+                if(rates[0] / rates[1] == 0.5,
+                    {special = true},
+                    {special = false}
+                );
+                if(special,
+                    {
+                        // Add less terrible hidden state sounds to this
+                        synth = Synth.new("clap");
+                    }
+                );
+                0.2.wait;
+            }.loop
+        };
+
     };
+
+
 
     ~rawDistances = rawDistances;
     ~arduinoLog = Task({
@@ -217,7 +226,17 @@ s.waitForBoot({
 
 });
 )
+max(0, 6)
 
+for(0, 5, {arg i; i.postln})
+(0..5)
+(
+~rates[0] = 10;
+~rates[1] = 5;
+~rates[2] = 7;
+~rates[3] = 10;
+
+)
 
 ~rates
 5.postln
