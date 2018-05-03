@@ -77,7 +77,7 @@ s.waitForBoot({
 
     ~printInd = 0;
 
-    ~printDist = true;
+    ~printDist = false;
     ~distlog = [nil, nil, nil, nil];
 
     "STARTING USB READ/WRITE LOOP".postln;
@@ -131,13 +131,18 @@ s.waitForBoot({
     Routine.run(readValues);
 
 
-    "DEFINING SYNTHS".postln;
+
     Routine.run {
+        "PRE SERVER BOOT".postln;
+
         s.bootSync;
 
+        "SETTING INITIAL BUS VALUES".postln;
         (0..files.size).do({|i| controlBusses[i].set(1)});
 
         s.sync;
+
+        "DEFINING SYNTHS".postln;
 
         for(0, files.size-2, {
             arg i;
@@ -150,7 +155,7 @@ s.waitForBoot({
             s.sync;
 
             SynthDef.new(file, {
-                var freq = 1500;
+                var freq = 3000;
                 Out.ar(i, LPF.ar(LPF.ar(PlayBuf.ar(1, trackBuffer, doneAction:2), freq), freq) * In.kr(controlBusses[i]) );
             }).send(s);
 
@@ -203,6 +208,8 @@ s.waitForBoot({
         });
 
 
+        "Starting decay detection".postln;
+
 
         Task({
             {
@@ -240,7 +247,7 @@ s.waitForBoot({
 
     };
 
-
+    "POST SERVER ROUTINE".postln;
 
     ~rawDistances = rawDistances;
     ~arduinoLog = Task({

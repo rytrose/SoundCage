@@ -143,4 +143,6 @@ s.waitForBoot({
 
 });
 
+
+SuperDirt.start
 0.range(0.05, 0.95)
